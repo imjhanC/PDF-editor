@@ -130,7 +130,7 @@ def open_split_screen(parent, pdf_path):
             font=ctk.CTkFont(size=16, weight="bold")
         )
         page_title.pack(side="left", padx=20, pady=5)
-
+        
         # Create a container frame for the page and zoom controls
         page_container = ctk.CTkFrame(right_panel)
         page_container.pack(fill="both", expand=True, padx=10, pady=10)
@@ -207,13 +207,12 @@ def open_split_screen(parent, pdf_path):
             
             # Update scroll region
             page_scroll_frame.update_idletasks()
-        
-        # Initial render
-        update_zoom(1.0)
+            page_scroll_frame._parent_canvas.configure(scrollregion=page_scroll_frame._parent_canvas.bbox("all"))
         
         # Enable mouse wheel scrolling
         def on_mousewheel(event):
-            page_scroll_frame._parent_canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+            # Increase scroll speed by multiplying the delta by 10
+            page_scroll_frame._parent_canvas.yview_scroll(int(-10 * (event.delta / 120)), "units")
         
         page_scroll_frame.bind_all("<MouseWheel>", on_mousewheel)
         
@@ -222,6 +221,9 @@ def open_split_screen(parent, pdf_path):
             page_scroll_frame.unbind_all("<MouseWheel>")
         
         right_panel.bind("<Unmap>", lambda e: cleanup_binding())
+        
+        # Initial render
+        update_zoom(1.0)
 
     # Dynamic tab layout - updated to account for variable panel width
     tab_spacing = 10
@@ -256,6 +258,9 @@ def open_split_screen(parent, pdf_path):
         tab_frame = ctk.CTkFrame(tabs_frame, width=actual_tab_width, height=actual_tab_height)
         tab_frame.grid(row=row, column=col, padx=tab_spacing, pady=tab_spacing, sticky="nsew")
         tab_frame.grid_propagate(False)
+        
+        # Store the page number in the frame for reference
+        tab_frame.page_num = page_num
 
         # Get the page
         page = pdf_document[page_num]
@@ -276,6 +281,86 @@ def open_split_screen(parent, pdf_path):
         page_label = ctk.CTkLabel(tab_frame, text=f"Page {page_num + 1}")
         page_label.pack(pady=(0, 5))
 
+        # Create a preview frame (initially hidden)
+        preview_frame = ctk.CTkFrame(tabs_frame, width=actual_tab_width, height=actual_tab_height,
+                                   fg_color=("gray70", "gray40"), border_width=2, border_color=("white", "gray"))
+        preview_frame.place_forget()  # Initially hidden
+
+        # Add drag and drop functionality
+        def on_drag_start(event, frame=tab_frame, preview=preview_frame):
+            # Store the starting position
+            frame._drag_start_x = event.x
+            frame._drag_start_y = event.y
+            frame.lift()  # Bring to front while dragging
+            frame.configure(fg_color=("gray70", "gray40"))  # Highlight while dragging
+            # Show preview frame
+            preview.lift()
+            preview.place(x=frame.winfo_x(), y=frame.winfo_y())
+
+        def on_drag_motion(event, frame=tab_frame, preview=preview_frame):
+            # Calculate new position
+            x = frame.winfo_x() - frame._drag_start_x + event.x
+            y = frame.winfo_y() - frame._drag_start_y + event.y
+            frame.place(x=x, y=y)
+            
+            # Calculate the potential new grid position
+            new_col = max(0, min(columns - 1, int(x / (actual_tab_width + tab_spacing))))
+            new_row = max(0, min(rows - 1, int(y / (actual_tab_height + tab_spacing))))
+            
+            # Calculate the position for the preview frame
+            preview_x = new_col * (actual_tab_width + tab_spacing) + tab_spacing
+            preview_y = new_row * (actual_tab_height + tab_spacing) + tab_spacing
+            
+            # Update preview frame position
+            preview.place(x=preview_x, y=preview_y)
+
+        def on_drag_release(event, frame=tab_frame, preview=preview_frame):
+            # Hide preview frame
+            preview.place_forget()
+            
+            # Reset appearance
+            frame.configure(fg_color=("gray60", "gray30"))
+            
+            # Calculate the new grid position
+            x = frame.winfo_x()
+            y = frame.winfo_y()
+            
+            # Calculate new column and row
+            new_col = max(0, min(columns - 1, int(x / (actual_tab_width + tab_spacing))))
+            new_row = max(0, min(rows - 1, int(y / (actual_tab_height + tab_spacing))))
+            
+            # Get the target page number
+            target_pos = new_row * columns + new_col
+            if 0 <= target_pos < num_pages:
+                # Get the current page number
+                current_page = frame.page_num
+                
+                # Update the grid positions of all affected frames
+                for i in range(num_pages):
+                    if i == current_page:
+                        continue
+                    other_frame = tabs_frame.grid_slaves(row=i//columns, column=i%columns)[0]
+                    if i == target_pos:
+                        # Move the dragged frame to the target position
+                        frame.grid(row=new_row, column=new_col)
+                        # Move the target frame to the old position
+                        other_frame.grid(row=current_page//columns, column=current_page%columns)
+                        # Update page numbers
+                        other_frame.page_num = current_page
+                        frame.page_num = target_pos
+                        # Update labels
+                        other_frame.winfo_children()[1].configure(text=f"Page {current_page + 1}")
+                        frame.winfo_children()[1].configure(text=f"Page {target_pos + 1}")
+                        break
+            
+            # Reset the frame's position in the grid
+            frame.grid(row=new_row, column=new_col)
+
+        # Bind drag and drop events
+        tab_frame.bind("<Button-1>", on_drag_start)
+        tab_frame.bind("<B1-Motion>", on_drag_motion)
+        tab_frame.bind("<ButtonRelease-1>", on_drag_release)
+        
         # Bind double-click event to show page detail
         def make_double_click_handler(page_idx):
             def on_double_click(event):
