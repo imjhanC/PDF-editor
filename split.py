@@ -17,6 +17,9 @@ def open_split_screen(parent, pdf_path):
     split_win.title("Split PDF")
     split_win.configure(bg="#2b2b2b")
 
+    # Add variable to track delete confirmation preference
+    show_delete_confirmation = tk.BooleanVar(value=True)
+
     # Create menu bar with dark theme
     menu_bar = tk.Menu(split_win, 
                       bg='#2b2b2b',
@@ -333,136 +336,311 @@ def open_split_screen(parent, pdf_path):
         page_label = ctk.CTkLabel(tab_frame, text=f"Page {page_num + 1}")
         page_label.pack(pady=(0, 5))
 
+        # Add delete button
+        delete_button = ctk.CTkButton(
+            tab_frame,
+            text="×",
+            width=20,
+            height=20,
+            fg_color=("gray70", "gray50"),
+            hover_color=("red", "red"),
+            command=lambda f=tab_frame, p=page_num: delete_page(f, p)
+        )
+        delete_button.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+
+        def delete_page(frame, page_idx):
+            def perform_delete():
+                try:
+                    # Get the original page number from the frame
+                    original_page_num = frame.page_num
+                    
+                    # Remove the page from current_page_order
+                    if original_page_num in current_page_order:
+                        current_page_order.remove(original_page_num)
+                        
+                        # Destroy the frame
+                        frame.destroy()
+                        
+                        # Update the remaining pages' positions and labels
+                        update_page_positions()
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to delete page: {str(e)}")
+
+            if show_delete_confirmation.get():
+                # Create custom confirmation dialog
+                confirm_dialog = ctk.CTkToplevel(split_win)
+                confirm_dialog.title("Confirm Delete")
+                confirm_dialog.geometry("300x150")
+                confirm_dialog.transient(split_win)
+                confirm_dialog.grab_set()
+
+                # Center the dialog
+                confirm_dialog.update_idletasks()
+                x = split_win.winfo_x() + (split_win.winfo_width() - confirm_dialog.winfo_width()) // 2
+                y = split_win.winfo_y() + (split_win.winfo_height() - confirm_dialog.winfo_height()) // 2
+                confirm_dialog.geometry(f"+{x}+{y}")
+
+                # Add message
+                msg_label = ctk.CTkLabel(
+                    confirm_dialog,
+                    text=f"Are you sure you want to delete Page {page_idx + 1}?",
+                    wraplength=250
+                )
+                msg_label.pack(pady=(20, 10))
+
+                # Add checkbox for "don't show again"
+                checkbox = ctk.CTkCheckBox(
+                    confirm_dialog,
+                    text="Don't show this message again",
+                    command=lambda: show_delete_confirmation.set(not checkbox.get())
+                )
+                checkbox.pack(pady=(0, 10))
+
+                # Add buttons
+                button_frame = ctk.CTkFrame(confirm_dialog)
+                button_frame.pack(pady=(0, 10))
+
+                def on_confirm():
+                    confirm_dialog.destroy()
+                    perform_delete()
+
+                def on_cancel():
+                    confirm_dialog.destroy()
+
+                confirm_btn = ctk.CTkButton(
+                    button_frame,
+                    text="Delete",
+                    fg_color=("red", "red"),
+                    command=on_confirm
+                )
+                confirm_btn.pack(side="left", padx=5)
+
+                cancel_btn = ctk.CTkButton(
+                    button_frame,
+                    text="Cancel",
+                    command=on_cancel
+                )
+                cancel_btn.pack(side="left", padx=5)
+
+                # Wait for dialog to close
+                split_win.wait_window(confirm_dialog)
+            else:
+                perform_delete()
+
+        def update_page_positions():
+            # Clear the tabs frame
+            for widget in tabs_frame.winfo_children():
+                widget.destroy()
+            
+            # Recreate all tabs with updated positions
+            for new_idx, original_page_num in enumerate(current_page_order):
+                row = new_idx // columns
+                col = new_idx % columns
+
+                tab_frame = ctk.CTkFrame(tabs_frame, width=actual_tab_width, height=actual_tab_height)
+                tab_frame.grid(row=row, column=col, padx=tab_spacing, pady=tab_spacing, sticky="nsew")
+                tab_frame.grid_propagate(False)
+                tab_frame.page_num = original_page_num  # Store the original page number
+
+                page = pdf_document[original_page_num]
+                pix = page.get_pixmap(matrix=fitz.Matrix(0.3, 0.3))
+                img_data = pix.tobytes("png")
+                img = Image.open(io.BytesIO(img_data))
+                img.thumbnail((actual_tab_width - 20, actual_tab_height - 40), Image.Resampling.LANCZOS)
+                photo = ImageTk.PhotoImage(img)
+
+                preview_label = ctk.CTkLabel(tab_frame, image=photo, text="")
+                preview_label.image = photo
+                preview_label.pack(pady=(5, 0))
+
+                page_label = ctk.CTkLabel(tab_frame, text=f"Page {new_idx + 1}")
+                page_label.pack(pady=(0, 5))
+
+                # Add delete button with original page number
+                delete_button = ctk.CTkButton(
+                    tab_frame,
+                    text="×",
+                    width=20,
+                    height=20,
+                    fg_color=("gray70", "gray50"),
+                    hover_color=("red", "red"),
+                    command=lambda f=tab_frame, p=original_page_num: delete_page(f, p)
+                )
+                delete_button.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
+
+                # Bind drag and double-click events - THIS IS THE CRUCIAL FIX
+                tab_frame.bind("<Button-1>", lambda e, f=tab_frame: on_drag_start(e, f))
+                tab_frame.bind("<B1-Motion>", lambda e, f=tab_frame: on_drag_motion(e, f))
+                tab_frame.bind("<ButtonRelease-1>", lambda e, f=tab_frame: on_drag_release(e, f))
+                
+                double_click_handler = make_double_click_handler(original_page_num)
+                tab_frame.bind("<Double-Button-1>", double_click_handler)
+                preview_label.bind("<Double-Button-1>", double_click_handler)
+                page_label.bind("<Double-Button-1>", double_click_handler)
+
         def on_drag_start(event, frame=tab_frame):
             nonlocal is_dragging, drag_shadow, original_positions, current_animation
             
             if is_dragging or current_animation:
                 return
                 
-            is_dragging = True
-            original_positions[frame] = {
-                'row': frame.grid_info()['row'],
-                'column': frame.grid_info()['column']
-            }
-            
-            frame._drag_start_x = event.x
-            frame._drag_start_y = event.y
-            
-            if drag_shadow:
-                drag_shadow.destroy()
+            try:
+                # Check if frame still exists and is managed by grid
+                if not frame.winfo_exists() or not frame.grid_info():
+                    return
+                    
+                is_dragging = True
+                original_positions[frame] = {
+                    'row': frame.grid_info()['row'],
+                    'column': frame.grid_info()['column']
+                }
+                
+                frame._drag_start_x = event.x
+                frame._drag_start_y = event.y
+                
+                if drag_shadow:
+                    drag_shadow.destroy()
+                    drag_shadow = None
+                
+                drag_shadow = ctk.CTkFrame(
+                    tabs_frame, 
+                    width=actual_tab_width, 
+                    height=actual_tab_height,
+                    fg_color=("gray40", "gray60"),
+                    border_width=3,
+                    border_color=("#3B8ED0", "#3B8ED0")
+                )
+                
+                shadow_img_label = ctk.CTkLabel(drag_shadow, image=frame.winfo_children()[0].cget("image"), text="")
+                shadow_img_label.pack(pady=(5, 0))
+                shadow_page_label = ctk.CTkLabel(drag_shadow, text=frame.winfo_children()[1].cget("text"))
+                shadow_page_label.pack(pady=(0, 5))
+                
+                drag_shadow.place(x=frame.winfo_x(), y=frame.winfo_y())
+                drag_shadow.lift()
+                
+                frame.configure(fg_color=("gray80", "gray20"), corner_radius=10)
+                
+                for child in tabs_frame.winfo_children():
+                    if child != frame and hasattr(child, 'page_num'):
+                        child.configure(border_width=1, border_color=("gray70", "gray50"))
+            except Exception as e:
+                is_dragging = False
+                if drag_shadow and drag_shadow.winfo_exists():
+                    drag_shadow.destroy()
                 drag_shadow = None
-            
-            drag_shadow = ctk.CTkFrame(
-                tabs_frame, 
-                width=actual_tab_width, 
-                height=actual_tab_height,
-                fg_color=("gray40", "gray60"),
-                border_width=3,
-                border_color=("#3B8ED0", "#3B8ED0")
-            )
-            
-            shadow_img_label = ctk.CTkLabel(drag_shadow, image=frame.winfo_children()[0].cget("image"), text="")
-            shadow_img_label.pack(pady=(5, 0))
-            shadow_page_label = ctk.CTkLabel(drag_shadow, text=frame.winfo_children()[1].cget("text"))
-            shadow_page_label.pack(pady=(0, 5))
-            
-            drag_shadow.place(x=frame.winfo_x(), y=frame.winfo_y())
-            drag_shadow.lift()
-            
-            frame.configure(fg_color=("gray80", "gray20"), corner_radius=10)
-            
-            for child in tabs_frame.winfo_children():
-                if child != frame and hasattr(child, 'page_num'):
-                    child.configure(border_width=1, border_color=("gray70", "gray50"))
+                messagebox.showerror("Error", f"Failed to start drag: {str(e)}")
 
         def on_drag_motion(event, frame=tab_frame):
             nonlocal drag_shadow, drop_zone_indicator
             
-            if not is_dragging or drag_shadow is None:
+            if not is_dragging or drag_shadow is None or not frame.winfo_exists():
                 return
                 
-            x = frame.winfo_x() - frame._drag_start_x + event.x
-            y = frame.winfo_y() - frame._drag_start_y + event.y
-            
-            if drag_shadow.winfo_exists():
-                drag_shadow.place(x=x, y=y)
-            
-            new_col = max(0, min(columns - 1, int(x / (actual_tab_width + tab_spacing))))
-            new_row = max(0, min(rows - 1, int(y / (actual_tab_height + tab_spacing))))
-            
-            if drop_zone_indicator:
-                drop_zone_indicator.destroy()
+            try:
+                x = frame.winfo_x() - frame._drag_start_x + event.x
+                y = frame.winfo_y() - frame._drag_start_y + event.y
+                
+                if drag_shadow.winfo_exists():
+                    drag_shadow.place(x=x, y=y)
+                
+                new_col = max(0, min(columns - 1, int(x / (actual_tab_width + tab_spacing))))
+                new_row = max(0, min(rows - 1, int(y / (actual_tab_height + tab_spacing))))
+                
+                if drop_zone_indicator:
+                    drop_zone_indicator.destroy()
+                    drop_zone_indicator = None
+                
+                target_pos = new_row * columns + new_col
+                if 0 <= target_pos < len(current_page_order):
+                    target_x = new_col * (actual_tab_width + tab_spacing) + tab_spacing
+                    target_y = new_row * (actual_tab_height + tab_spacing) + tab_spacing
+                    
+                    drop_zone_indicator = ctk.CTkFrame(
+                        tabs_frame,
+                        width=actual_tab_width,
+                        height=actual_tab_height,
+                        fg_color="transparent",
+                        border_width=3,
+                        border_color=("#1f538d", "#42a2d6"),
+                        corner_radius=15
+                    )
+                    drop_zone_indicator.place(x=target_x, y=target_y)
+                    
+                    pulse_label = ctk.CTkLabel(
+                        drop_zone_indicator, 
+                        text="Drop Here",
+                        font=ctk.CTkFont(size=14, weight="bold"),
+                        text_color=("#1f538d", "#42a2d6")
+                    )
+                    pulse_label.place(relx=0.5, rely=0.5, anchor="center")
+            except Exception as e:
+                if drop_zone_indicator and drop_zone_indicator.winfo_exists():
+                    drop_zone_indicator.destroy()
                 drop_zone_indicator = None
-            
-            target_pos = new_row * columns + new_col
-            if 0 <= target_pos < num_pages:
-                target_x = new_col * (actual_tab_width + tab_spacing) + tab_spacing
-                target_y = new_row * (actual_tab_height + tab_spacing) + tab_spacing
-                
-                drop_zone_indicator = ctk.CTkFrame(
-                    tabs_frame,
-                    width=actual_tab_width,
-                    height=actual_tab_height,
-                    fg_color="transparent",
-                    border_width=3,
-                    border_color=("#1f538d", "#42a2d6"),
-                    corner_radius=15
-                )
-                drop_zone_indicator.place(x=target_x, y=target_y)
-                
-                pulse_label = ctk.CTkLabel(
-                    drop_zone_indicator, 
-                    text="Drop Here",
-                    font=ctk.CTkFont(size=14, weight="bold"),
-                    text_color=("#1f538d", "#42a2d6")
-                )
-                pulse_label.place(relx=0.5, rely=0.5, anchor="center")
 
         def on_drag_release(event, frame=tab_frame):
             nonlocal is_dragging, drag_shadow, drop_zone_indicator, original_positions, current_animation
             
-            if not is_dragging:
+            if not is_dragging or not frame.winfo_exists():
                 return
                 
-            is_dragging = False
-            
-            final_x = final_y = 0
-            if drag_shadow and drag_shadow.winfo_exists():
-                final_x = drag_shadow.winfo_x()
-                final_y = drag_shadow.winfo_y()
-                drag_shadow.destroy()
-                drag_shadow = None
-            
-            if drop_zone_indicator and drop_zone_indicator.winfo_exists():
-                drop_zone_indicator.destroy()
-                drop_zone_indicator = None
-            
-            for child in tabs_frame.winfo_children():
-                if hasattr(child, 'page_num'):
-                    child.configure(
-                        fg_color=("gray60", "gray30"), 
-                        border_width=0,
-                        corner_radius=6
-                    )
-            
-            new_col = max(0, min(columns - 1, int(final_x / (actual_tab_width + tab_spacing))))
-            new_row = max(0, min(rows - 1, int(final_y / (actual_tab_height + tab_spacing))))
-            target_pos = new_row * columns + new_col
-            
-            if 0 <= target_pos < num_pages:
-                current_page = frame.page_num
-                target_frame = None
-                for child in tabs_frame.winfo_children():
-                    if hasattr(child, 'page_num') and child.page_num == target_pos:
-                        target_frame = child
-                        break
+            try:
+                is_dragging = False
                 
-                if target_frame and target_frame != frame:
-                    animate_swap(frame, target_frame, current_page, target_pos)
+                final_x = final_y = 0
+                if drag_shadow and drag_shadow.winfo_exists():
+                    final_x = drag_shadow.winfo_x()
+                    final_y = drag_shadow.winfo_y()
+                    drag_shadow.destroy()
+                    drag_shadow = None
+                
+                if drop_zone_indicator and drop_zone_indicator.winfo_exists():
+                    drop_zone_indicator.destroy()
+                    drop_zone_indicator = None
+                
+                for child in tabs_frame.winfo_children():
+                    if hasattr(child, 'page_num'):
+                        child.configure(
+                            fg_color=("gray60", "gray30"), 
+                            border_width=0,
+                            corner_radius=6
+                        )
+                
+                new_col = max(0, min(columns - 1, int(final_x / (actual_tab_width + tab_spacing))))
+                new_row = max(0, min(rows - 1, int(final_y / (actual_tab_height + tab_spacing))))
+                target_pos = new_row * columns + new_col
+                
+                if 0 <= target_pos < len(current_page_order):
+                    # Get the current position of the dragged frame
+                    current_pos = None
+                    for i, page_num in enumerate(current_page_order):
+                        if page_num == frame.page_num:
+                            current_pos = i
+                            break
+                    
+                    if current_pos is not None and current_pos != target_pos:
+                        # Find the target frame
+                        target_frame = None
+                        for child in tabs_frame.winfo_children():
+                            if hasattr(child, 'page_num') and child.page_num == current_page_order[target_pos]:
+                                target_frame = child
+                                break
+                        
+                        if target_frame and target_frame != frame:
+                            animate_swap(frame, target_frame, current_pos, target_pos)
+                        else:
+                            animate_return_to_original(frame)
+                    else:
+                        animate_return_to_original(frame)
                 else:
                     animate_return_to_original(frame)
-            else:
-                animate_return_to_original(frame)
+            except Exception as e:
+                if drag_shadow and drag_shadow.winfo_exists():
+                    drag_shadow.destroy()
+                if drop_zone_indicator and drop_zone_indicator.winfo_exists():
+                    drop_zone_indicator.destroy()
+                messagebox.showerror("Error", f"Failed to complete drag: {str(e)}")
 
         def animate_swap(frame1, frame2, pos1, pos2):
             nonlocal current_animation, current_page_order
@@ -471,77 +649,80 @@ def open_split_screen(parent, pdf_path):
                 split_win.after_cancel(current_animation)
                 current_animation = None
             
-            # Swap the pages in our tracking array
-            current_page_order[pos1], current_page_order[pos2] = current_page_order[pos2], current_page_order[pos1]
-            
-            grid1 = frame1.grid_info()
-            grid2 = frame2.grid_info()
-            
-            target1_x = grid2['column'] * (actual_tab_width + tab_spacing) + tab_spacing
-            target1_y = grid2['row'] * (actual_tab_height + tab_spacing) + tab_spacing
-            target2_x = grid1['column'] * (actual_tab_width + tab_spacing) + tab_spacing
-            target2_y = grid1['row'] * (actual_tab_height + tab_spacing) + tab_spacing
-            
-            start1_x, start1_y = frame1.winfo_x(), frame1.winfo_y()
-            start2_x, start2_y = frame2.winfo_x(), frame2.winfo_y()
-            
-            frame1.grid_forget()
-            frame2.grid_forget()
-            frame1.place(x=start1_x, y=start1_y)
-            frame2.place(x=start2_x, y=start2_y)
-            
-            animation_duration = 200
-            animation_steps = 8
-            step_duration = animation_duration // animation_steps
-            current_step = 0
-            
-            def animate_step():
-                nonlocal current_step, current_animation
+            try:
+                # Swap the pages in our tracking array
+                current_page_order[pos1], current_page_order[pos2] = current_page_order[pos2], current_page_order[pos1]
                 
-                if not (frame1.winfo_exists() and frame2.winfo_exists()):
-                    current_animation = None
-                    return
+                grid1 = frame1.grid_info()
+                grid2 = frame2.grid_info()
                 
-                if current_step <= animation_steps:
-                    progress = current_step / animation_steps
-                    ease_progress = 1 - (1 - progress) ** 2
+                target1_x = grid2['column'] * (actual_tab_width + tab_spacing) + tab_spacing
+                target1_y = grid2['row'] * (actual_tab_height + tab_spacing) + tab_spacing
+                target2_x = grid1['column'] * (actual_tab_width + tab_spacing) + tab_spacing
+                target2_y = grid1['row'] * (actual_tab_height + tab_spacing) + tab_spacing
+                
+                start1_x, start1_y = frame1.winfo_x(), frame1.winfo_y()
+                start2_x, start2_y = frame2.winfo_x(), frame2.winfo_y()
+                
+                frame1.grid_forget()
+                frame2.grid_forget()
+                frame1.place(x=start1_x, y=start1_y)
+                frame2.place(x=start2_x, y=start2_y)
+                
+                animation_duration = 200
+                animation_steps = 8
+                step_duration = animation_duration // animation_steps
+                current_step = 0
+                
+                def animate_step():
+                    nonlocal current_step, current_animation
                     
-                    frame1_x = start1_x + (target1_x - start1_x) * ease_progress
-                    frame1_y = start1_y + (target1_y - start1_y) * ease_progress
-                    frame2_x = start2_x + (target2_x - start2_x) * ease_progress
-                    frame2_y = start2_y + (target2_y - start2_y) * ease_progress
+                    if not (frame1.winfo_exists() and frame2.winfo_exists()):
+                        current_animation = None
+                        return
                     
-                    frame1.place(x=int(frame1_x), y=int(frame1_y))
-                    frame2.place(x=int(frame2_x), y=int(frame2_y))
-                    
-                    current_step += 1
-                    current_animation = split_win.after(step_duration, animate_step)
-                else:
-                    current_animation = None
-                    frame1.place_forget()
-                    frame2.place_forget()
-                    
-                    frame1.grid(row=grid2['row'], column=grid2['column'], 
-                            padx=tab_spacing, pady=tab_spacing, sticky="nsew")
-                    frame2.grid(row=grid1['row'], column=grid1['column'], 
-                            padx=tab_spacing, pady=tab_spacing, sticky="nsew")
-                    
-                    # Update the frame positions but keep original page_num for reference
-                    frame1.page_num = pos2
-                    frame2.page_num = pos1
-                    
-                    # Update labels to show new logical page numbers
-                    frame1.winfo_children()[1].configure(text=f"Page {pos2 + 1}")
-                    frame2.winfo_children()[1].configure(text=f"Page {pos1 + 1}")
-                    
-                    frame1.configure(fg_color=("#4a9eff", "#4a9eff"))
-                    frame2.configure(fg_color=("#4a9eff", "#4a9eff"))
-                    split_win.after(100, lambda: (
-                        frame1.configure(fg_color=("gray60", "gray30")) if frame1.winfo_exists() else None,
-                        frame2.configure(fg_color=("gray60", "gray30")) if frame2.winfo_exists() else None
-                    ))
-            
-            animate_step()
+                    if current_step <= animation_steps:
+                        progress = current_step / animation_steps
+                        ease_progress = 1 - (1 - progress) ** 2
+                        
+                        frame1_x = start1_x + (target1_x - start1_x) * ease_progress
+                        frame1_y = start1_y + (target1_y - start1_y) * ease_progress
+                        frame2_x = start2_x + (target2_x - start2_x) * ease_progress
+                        frame2_y = start2_y + (target2_y - start2_y) * ease_progress
+                        
+                        frame1.place(x=int(frame1_x), y=int(frame1_y))
+                        frame2.place(x=int(frame2_x), y=int(frame2_y))
+                        
+                        current_step += 1
+                        current_animation = split_win.after(step_duration, animate_step)
+                    else:
+                        current_animation = None
+                        frame1.place_forget()
+                        frame2.place_forget()
+                        
+                        frame1.grid(row=grid2['row'], column=grid2['column'], 
+                                padx=tab_spacing, pady=tab_spacing, sticky="nsew")
+                        frame2.grid(row=grid1['row'], column=grid1['column'], 
+                                padx=tab_spacing, pady=tab_spacing, sticky="nsew")
+                        
+                        # Update the page_num attributes to reflect the new positions
+                        frame1.page_num = current_page_order[pos2]
+                        frame2.page_num = current_page_order[pos1]
+                        
+                        # Update labels to show new logical page numbers
+                        frame1.winfo_children()[1].configure(text=f"Page {pos2 + 1}")
+                        frame2.winfo_children()[1].configure(text=f"Page {pos1 + 1}")
+                        
+                        frame1.configure(fg_color=("#4a9eff", "#4a9eff"))
+                        frame2.configure(fg_color=("#4a9eff", "#4a9eff"))
+                        split_win.after(100, lambda: (
+                            frame1.configure(fg_color=("gray60", "gray30")) if frame1.winfo_exists() else None,
+                            frame2.configure(fg_color=("gray60", "gray30")) if frame2.winfo_exists() else None
+                        ))
+                
+                animate_step()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to swap pages: {str(e)}")
 
         def animate_return_to_original(frame):
             nonlocal current_animation
