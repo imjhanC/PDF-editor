@@ -7,6 +7,7 @@ import math
 import tkinter as tk
 from tkinter import filedialog, messagebox
 
+
 def open_split_screen(parent, pdf_path):
     # Hide the parent window
     parent.withdraw()
@@ -44,36 +45,21 @@ def open_split_screen(parent, pdf_path):
                 # Create a new PDF document
                 new_doc = fitz.open()
                 
-                # Get the current page order from the grid
-                current_order = []
+                # Use the current_page_order which tracks the swaps
+                print(f"Saving PDF with page order: {current_page_order}")
                 
-                # First collect all frames in grid order
-                grid_frames = []
-                for row in range(rows):
-                    for col in range(columns):
-                        pos = row * columns + col
-                        if pos < num_pages:
-                            slaves = tabs_frame.grid_slaves(row=row, column=col)
-                            if slaves:
-                                frame = slaves[0]
-                                grid_frames.append(frame)
-                
-                # Now get the page numbers in the current order
-                for frame in grid_frames:
-                    if hasattr(frame, 'page_num'):
-                        current_order.append(frame.page_num)
-                
-                # Add pages in the current order
-                for page_num in current_order:
-                    new_doc.insert_pdf(pdf_document, from_page=page_num, to_page=page_num)
+                # Add pages in the current swapped order
+                for original_page_num in current_page_order:
+                    new_doc.insert_pdf(pdf_document, from_page=original_page_num, to_page=original_page_num)
                 
                 # Save the new PDF
                 new_doc.save(file_path)
                 new_doc.close()
                 
-                messagebox.showinfo("Success", "PDF saved successfully!")
+                messagebox.showinfo("Success", f"PDF saved successfully with {len(current_page_order)} pages!")
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save PDF: {str(e)}")
+
 
     # Add Save As to File menu
     file_menu.add_command(label="Save As", command=save_as)
@@ -178,6 +164,7 @@ def open_split_screen(parent, pdf_path):
     # Open the PDF file
     pdf_document = fitz.open(pdf_path)
     num_pages = len(pdf_document)
+    current_page_order = list(range(num_pages))
 
     def show_page_detail(page_num):
         # Clear right panel
@@ -478,11 +465,14 @@ def open_split_screen(parent, pdf_path):
                 animate_return_to_original(frame)
 
         def animate_swap(frame1, frame2, pos1, pos2):
-            nonlocal current_animation
+            nonlocal current_animation, current_page_order
             
             if current_animation:
                 split_win.after_cancel(current_animation)
                 current_animation = None
+            
+            # Swap the pages in our tracking array
+            current_page_order[pos1], current_page_order[pos2] = current_page_order[pos2], current_page_order[pos1]
             
             grid1 = frame1.grid_info()
             grid2 = frame2.grid_info()
@@ -532,13 +522,15 @@ def open_split_screen(parent, pdf_path):
                     frame2.place_forget()
                     
                     frame1.grid(row=grid2['row'], column=grid2['column'], 
-                              padx=tab_spacing, pady=tab_spacing, sticky="nsew")
+                            padx=tab_spacing, pady=tab_spacing, sticky="nsew")
                     frame2.grid(row=grid1['row'], column=grid1['column'], 
-                              padx=tab_spacing, pady=tab_spacing, sticky="nsew")
+                            padx=tab_spacing, pady=tab_spacing, sticky="nsew")
                     
+                    # Update the frame positions but keep original page_num for reference
                     frame1.page_num = pos2
                     frame2.page_num = pos1
                     
+                    # Update labels to show new logical page numbers
                     frame1.winfo_children()[1].configure(text=f"Page {pos2 + 1}")
                     frame2.winfo_children()[1].configure(text=f"Page {pos1 + 1}")
                     
