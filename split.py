@@ -6,9 +6,10 @@ import os
 import math
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from tkinterdnd2 import DND_FILES
 
 
-def open_split_screen(parent, pdf_path):
+def open_split_screen(parent, pdf_path, show_pdf_screen):
     # Hide the parent window
     parent.withdraw()
 
@@ -69,7 +70,97 @@ def open_split_screen(parent, pdf_path):
 
     # New menu
     def new_pdf():
-        messagebox.showinfo("New", "New PDF functionality will be implemented soon!")
+        # Create custom confirmation dialog
+        confirm_dialog = ctk.CTkToplevel(split_win)
+        confirm_dialog.title("Confirm New")
+        confirm_dialog.geometry("400x200")
+        confirm_dialog.transient(split_win)
+        confirm_dialog.grab_set()
+
+        # Center the dialog
+        confirm_dialog.update_idletasks()
+        x = split_win.winfo_x() + (split_win.winfo_width() - confirm_dialog.winfo_width()) // 2
+        y = split_win.winfo_y() + (split_win.winfo_height() - confirm_dialog.winfo_height()) // 2
+        confirm_dialog.geometry(f"+{x}+{y}")
+
+        # Add message
+        msg_label = ctk.CTkLabel(
+            confirm_dialog,
+            text="Do you want to discard changes and start a new PDF?",
+            wraplength=350,
+            font=ctk.CTkFont(size=14)
+        )
+        msg_label.pack(pady=(30, 20))
+
+        # Add buttons
+        button_frame = ctk.CTkFrame(confirm_dialog)
+        button_frame.pack(pady=(0, 20))
+
+        def on_confirm():
+            confirm_dialog.destroy()
+            # Close the current window
+            split_win.destroy()
+            # Show the parent window
+            parent.deiconify()
+            # Reset the main screen
+            for widget in parent.winfo_children():
+                widget.destroy()
+            
+            # Recreate the drop frame
+            drop_frame = ctk.CTkFrame(parent)
+            drop_frame.pack(expand=True, fill="both", padx=20, pady=20)
+            
+            # Recreate the drop label
+            drop_label = ctk.CTkLabel(drop_frame, text="Drag and drop PDF files here", font=("Arial", 20))
+            drop_label.pack(expand=True)
+            
+            # Recreate the attach button
+            def select_pdf():
+                file_path = filedialog.askopenfilename(
+                    filetypes=[("PDF files", "*.pdf")],
+                    title="Select a PDF file"
+                )
+                if file_path:
+                    if file_path.lower().endswith('.pdf'):
+                        show_pdf_screen(file_path)
+                    else:
+                        messagebox.showwarning("Invalid File", "Please select a PDF file")
+
+            attach_button = ctk.CTkButton(drop_frame, text="Or attach PDF here", command=select_pdf)
+            attach_button.pack(pady=(0, 250))
+            
+            # Re-enable drag and drop
+            drop_frame.drop_target_register(DND_FILES)
+            
+            def handle_drop(event):
+                file_path = event.data.strip('{}')
+                if file_path.lower().endswith('.pdf'):
+                    show_pdf_screen(file_path)
+                else:
+                    messagebox.showwarning("Invalid File", "Please drop a PDF file")
+            
+            drop_frame.dnd_bind('<<Drop>>', handle_drop)
+
+        def on_cancel():
+            confirm_dialog.destroy()
+
+        confirm_btn = ctk.CTkButton(
+            button_frame,
+            text="Yes, Start New",
+            command=on_confirm
+        )
+        confirm_btn.pack(side="left", padx=10)
+
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=on_cancel
+        )
+        cancel_btn.pack(side="left", padx=10)
+
+        # Wait for dialog to close
+        split_win.wait_window(confirm_dialog)
+
     menu_bar.add_command(label="New", command=new_pdf)
 
     # Exit menu

@@ -73,7 +73,7 @@ def show_pdf_screen(pdf_path):
     # Split and Merge buttons in a horizontal frame
     button_frame = ctk.CTkFrame(drop_frame, fg_color="transparent")
     button_frame.pack(pady=(0, 10), fill="x", padx=40)
-    split_button = ctk.CTkButton(button_frame, text="Split", command=lambda: open_split_screen(app, pdf_path))
+    split_button = ctk.CTkButton(button_frame, text="Split", command=lambda: open_split_screen(app, pdf_path, show_pdf_screen))
     split_button.pack(side="left", expand=True, fill="x", padx=(0, 10))
     merge_button = ctk.CTkButton(button_frame, text="Merge")
     merge_button.pack(side="right", expand=True, fill="x", padx=(10, 0))
