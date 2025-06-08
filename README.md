@@ -20,6 +20,6 @@ A lightweight and user-friendly desktop PDF editor built with `customtkinter` an
 
 1. **Clone the repository**
 
-   ```bash
-   git clone https://github.com/yourusername/pdf-editor.git
+   ```git clone
+   git clone https://github.com/imjhanC/PDF-editor.git
    cd pdf-editor
