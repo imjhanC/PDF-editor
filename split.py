@@ -102,44 +102,8 @@ def open_split_screen(parent, pdf_path, show_pdf_screen):
             split_win.destroy()
             # Show the parent window
             parent.deiconify()
-            # Reset the main screen
-            for widget in parent.winfo_children():
-                widget.destroy()
-            
-            # Recreate the drop frame
-            drop_frame = ctk.CTkFrame(parent)
-            drop_frame.pack(expand=True, fill="both", padx=20, pady=20)
-            
-            # Recreate the drop label
-            drop_label = ctk.CTkLabel(drop_frame, text="Drag and drop PDF files here", font=("Arial", 20))
-            drop_label.pack(expand=True)
-            
-            # Recreate the attach button
-            def select_pdf():
-                file_path = filedialog.askopenfilename(
-                    filetypes=[("PDF files", "*.pdf")],
-                    title="Select a PDF file"
-                )
-                if file_path:
-                    if file_path.lower().endswith('.pdf'):
-                        show_pdf_screen(file_path)
-                    else:
-                        messagebox.showwarning("Invalid File", "Please select a PDF file")
-
-            attach_button = ctk.CTkButton(drop_frame, text="Or attach PDF here", command=select_pdf)
-            attach_button.pack(pady=(0, 250))
-            
-            # Re-enable drag and drop
-            drop_frame.drop_target_register(DND_FILES)
-            
-            def handle_drop(event):
-                file_path = event.data.strip('{}')
-                if file_path.lower().endswith('.pdf'):
-                    show_pdf_screen(file_path)
-                else:
-                    messagebox.showwarning("Invalid File", "Please drop a PDF file")
-            
-            drop_frame.dnd_bind('<<Drop>>', handle_drop)
+            # Reset the main screen by recreating it
+            show_pdf_screen(None)  # Pass None to indicate we want to show the initial screen
 
         def on_cancel():
             confirm_dialog.destroy()

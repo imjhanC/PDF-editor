@@ -61,6 +61,19 @@ def show_pdf_screen(pdf_path):
     for widget in drop_frame.winfo_children():
         widget.destroy()
 
+    if pdf_path is None:
+        # Show initial screen with drag and drop
+        drop_label = ctk.CTkLabel(drop_frame, text="Drag and drop PDF files here", font=("Arial", 20))
+        drop_label.pack(expand=True)
+        
+        attach_button = ctk.CTkButton(drop_frame, text="Or attach PDF here", command=select_pdf)
+        attach_button.pack(pady=(0, 250))
+        
+        # Re-enable drag and drop
+        drop_frame.drop_target_register(DND_FILES)
+        drop_frame.dnd_bind('<<Drop>>', lambda e: handle_drop(e))
+        return
+
     # Show PDF icon (using emoji as placeholder)
     pdf_icon_label = ctk.CTkLabel(drop_frame, text="📄", font=("Arial", 80))
     pdf_icon_label.pack(pady=(40, 10))
