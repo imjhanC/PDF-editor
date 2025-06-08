@@ -187,59 +187,165 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
     left_pdf_path = [pdf_path]  # Use the original PDF path
     right_pdf_path = [None]
 
-    # Function to show all pages in tabs
-    def show_all_pages():
+    # Global variables for page management
+    left_pages = []  # Will store page data for left PDF
+    right_pages = []  # Will store page data for right PDF
+
+    # Function to create draggable page thumbnail
+    def create_page_thumbnail(page, scale=0.3):
+        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        return ImageTk.PhotoImage(img)
+
+    # Function to show pages in tabs for each PDF
+    def show_pages_in_tabs():
         # Clear the main container
         for widget in main_container.winfo_children():
             widget.destroy()
 
-        # Create tabview
-        tabview = ctk.CTkTabview(main_container)
-        tabview.pack(expand=True, fill="both", padx=10, pady=10)
+        # Recreate left and right frames
+        left_main_frame = ctk.CTkFrame(main_container)
+        left_main_frame.pack(side="left", expand=True, fill="both", padx=(0, 5))
+        
+        right_main_frame = ctk.CTkFrame(main_container)
+        right_main_frame.pack(side="right", expand=True, fill="both", padx=(5, 0))
 
-        # Open both PDFs
+        # Add titles
+        left_title = ctk.CTkLabel(left_main_frame, text="PDF 1", font=ctk.CTkFont(size=16, weight="bold"))
+        left_title.pack(pady=(10, 5))
+        
+        right_title = ctk.CTkLabel(right_main_frame, text="PDF 2", font=ctk.CTkFont(size=16, weight="bold"))
+        right_title.pack(pady=(10, 5))
+
+        # Create scrollable frames for page thumbnails
+        left_scroll = ctk.CTkScrollableFrame(left_main_frame)
+        left_scroll.pack(expand=True, fill="both", padx=10, pady=10)
+        
+        right_scroll = ctk.CTkScrollableFrame(right_main_frame)
+        right_scroll.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Open both PDFs and load pages
         doc1 = fitz.open(left_pdf_path[0])
         doc2 = fitz.open(right_pdf_path[0])
 
-        # Create tabs for first PDF
+        # Clear previous page data
+        left_pages.clear()
+        right_pages.clear()
+
+        # Create page items for left PDF
         for page_num in range(len(doc1)):
             page = doc1[page_num]
-            tab_name = f"PDF1 - Page {page_num + 1}"
-            tabview.add(tab_name)
+            left_pages.append({'doc': doc1, 'page_num': page_num, 'original_pdf': 'left'})
             
-            # Create frame for the page
-            page_frame = ctk.CTkFrame(tabview.tab(tab_name))
-            page_frame.pack(expand=True, fill="both", padx=10, pady=10)
+            # Create page frame
+            page_frame = ctk.CTkFrame(left_scroll)
+            page_frame.pack(fill="x", pady=5, padx=5)
             
-            # Convert page to image
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            photo = ImageTk.PhotoImage(img)
+            # Create thumbnail
+            thumbnail = create_page_thumbnail(page)
             
-            # Create label for the page
-            page_label = ctk.CTkLabel(page_frame, image=photo, text="")
-            page_label.image = photo  # Keep a reference
-            page_label.pack(expand=True, fill="both")
+            # Create page label with drag functionality
+            page_label = ctk.CTkLabel(
+                page_frame, 
+                image=thumbnail, 
+                text=f"Page {page_num + 1}",
+                compound="top",
+                font=ctk.CTkFont(size=12)
+            )
+            page_label.image = thumbnail  # Keep reference
+            page_label.pack(pady=5)
+            
+            # Make the page draggable
+            page_label.bind("<Button-1>", lambda e, pn=page_num, src='left': start_drag(e, pn, src))
+            page_label.bind("<B1-Motion>", lambda e, pn=page_num, src='left': on_drag(e, pn, src))
+            page_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='left': end_drag(e, pn, src))
 
-        # Create tabs for second PDF
+        # Create page items for right PDF
         for page_num in range(len(doc2)):
             page = doc2[page_num]
-            tab_name = f"PDF2 - Page {page_num + 1}"
-            tabview.add(tab_name)
+            right_pages.append({'doc': doc2, 'page_num': page_num, 'original_pdf': 'right'})
             
-            # Create frame for the page
-            page_frame = ctk.CTkFrame(tabview.tab(tab_name))
-            page_frame.pack(expand=True, fill="both", padx=10, pady=10)
+            # Create page frame
+            page_frame = ctk.CTkFrame(right_scroll)
+            page_frame.pack(fill="x", pady=5, padx=5)
             
-            # Convert page to image
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
-            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-            photo = ImageTk.PhotoImage(img)
+            # Create thumbnail
+            thumbnail = create_page_thumbnail(page)
             
-            # Create label for the page
-            page_label = ctk.CTkLabel(page_frame, image=photo, text="")
-            page_label.image = photo  # Keep a reference
-            page_label.pack(expand=True, fill="both")
+            # Create page label with drag functionality
+            page_label = ctk.CTkLabel(
+                page_frame, 
+                image=thumbnail, 
+                text=f"Page {page_num + 1}",
+                compound="top",
+                font=ctk.CTkFont(size=12)
+            )
+            page_label.image = thumbnail  # Keep reference
+            page_label.pack(pady=5)
+            
+            # Make the page draggable
+            page_label.bind("<Button-1>", lambda e, pn=page_num, src='right': start_drag(e, pn, src))
+            page_label.bind("<B1-Motion>", lambda e, pn=page_num, src='right': on_drag(e, pn, src))
+            page_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='right': end_drag(e, pn, src))
+
+        # Enable drop zones for both scrollable frames
+        left_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'left'))
+        right_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'right'))
+
+        # Add action buttons
+        action_frame = ctk.CTkFrame(main_container)
+        action_frame.pack(fill="x", pady=(10, 0))
+
+        def save_merged_pdf():
+            # Implementation for saving the merged PDF
+            messagebox.showinfo("Save", "Save functionality will be implemented here")
+
+        def reset_pages():
+            # Reset to original state
+            show_pages_in_tabs()
+
+        save_btn = ctk.CTkButton(action_frame, text="Save Merged PDF", command=save_merged_pdf)
+        save_btn.pack(side="left", padx=10, pady=10)
+
+        reset_btn = ctk.CTkButton(action_frame, text="Reset", command=reset_pages)
+        reset_btn.pack(side="left", padx=10, pady=10)
+
+    # Drag and drop functionality
+    drag_data = {'dragging': False, 'page_num': None, 'source': None, 'widget': None}
+
+    def start_drag(event, page_num, source):
+        drag_data['dragging'] = True
+        drag_data['page_num'] = page_num
+        drag_data['source'] = source
+        drag_data['widget'] = event.widget
+        # Change cursor to indicate dragging
+        event.widget.configure(cursor="hand2")
+
+    def on_drag(event, page_num, source):
+        if drag_data['dragging']:
+            # Visual feedback during drag (optional)
+            pass
+
+    def end_drag(event, page_num, source):
+        if drag_data['dragging']:
+            # Reset cursor
+            event.widget.configure(cursor="")
+            drag_data['dragging'] = False
+            
+    def handle_drop_to_frame(event, target_frame):
+        if drag_data['dragging'] and drag_data['source'] != target_frame:
+            # Move page from source to target
+            source_pages = left_pages if drag_data['source'] == 'left' else right_pages
+            target_pages = left_pages if target_frame == 'left' else right_pages
+            
+            # Get the page data
+            page_data = source_pages.pop(drag_data['page_num'])
+            target_pages.append(page_data)
+            
+            messagebox.showinfo("Page Moved", f"Page {drag_data['page_num'] + 1} moved from {drag_data['source']} to {target_frame}")
+            
+            # Refresh the display
+            show_pages_in_tabs()
 
     # Function to show PDF preview
     def show_pdf_preview(frame, pdf_path, path_var):
@@ -319,25 +425,20 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 def remove_pdf():
                     path_var[0] = None
                     show_drop_area(frame, path_var)
-                    # Hide confirm button if it exists
-                    if hasattr(button_frame, 'confirm_button'):
-                        button_frame.confirm_button.pack_forget()
 
                 remove_btn = ctk.CTkButton(button_frame, text="Remove PDF", command=remove_pdf)
                 remove_btn.pack(side="left", padx=5)
 
                 # Show confirm button if both PDFs are present
                 if left_pdf_path[0] and right_pdf_path[0]:
-                    if not hasattr(button_frame, 'confirm_button'):
-                        confirm_button = ctk.CTkButton(
-                            button_frame,
-                            text="Confirm",
-                            command=show_all_pages,
-                            fg_color=("red", "red"),
-                            hover_color=("darkred", "darkred")
-                        )
-                        confirm_button.pack(side="left", padx=5)
-                        button_frame.confirm_button = confirm_button
+                    confirm_button = ctk.CTkButton(
+                        button_frame,
+                        text="Confirm",
+                        command=show_pages_in_tabs,  # Changed to show pages in tabs
+                        fg_color=("green", "green"),
+                        hover_color=("darkgreen", "darkgreen")
+                    )
+                    confirm_button.pack(side="left", padx=5)
 
     # Function to show drop area
     def show_drop_area(frame, path_var):
