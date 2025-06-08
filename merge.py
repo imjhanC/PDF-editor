@@ -174,36 +174,134 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
     main_container = ctk.CTkFrame(merge_win)
     main_container.pack(expand=True, fill="both", padx=10, pady=10)
 
-    # Create a frame for the drop area
-    drop_frame = ctk.CTkFrame(main_container)
-    drop_frame.pack(expand=True, fill="both", padx=20, pady=20)
-
-    # Create a label to show drop area
-    drop_label = ctk.CTkLabel(drop_frame, text="Drag and drop PDF files here to merge", font=("Arial", 20))
-    drop_label.pack(expand=True)
-
-    # Add a button to manually attach PDF files
-    def select_pdfs():
-        file_paths = filedialog.askopenfilenames(
-            filetypes=[("PDF files", "*.pdf")],
-            title="Select PDF files to merge"
-        )
-        if file_paths:
-            # TODO: Handle multiple PDF files for merging
-            pass
-
-    attach_button = ctk.CTkButton(drop_frame, text="Or select PDFs to merge", command=select_pdfs)
-    attach_button.pack(pady=(0, 250))
-
-    # Enable drag and drop
-    drop_frame.drop_target_register(DND_FILES)
+    # Create frames for left and right PDFs
+    left_frame = ctk.CTkFrame(main_container)
+    left_frame.pack(side="left", expand=True, fill="both", padx=(0, 5))
     
-    def handle_drop(event):
-        file_paths = event.data.strip('{}').split('} {')
-        # TODO: Handle multiple PDF files for merging
-        pass
-    
-    drop_frame.dnd_bind('<<Drop>>', handle_drop)
+    right_frame = ctk.CTkFrame(main_container)
+    right_frame.pack(side="right", expand=True, fill="both", padx=(5, 0))
+
+    # Variables to store PDF paths
+    left_pdf_path = [pdf_path]  # Use the original PDF path
+    right_pdf_path = [None]
+
+    # Function to show PDF preview
+    def show_pdf_preview(frame, pdf_path, path_var):
+        # Clear the frame
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        if pdf_path:
+            # Show PDF icon
+            pdf_icon_label = ctk.CTkLabel(frame, text="📄", font=("Arial", 40))
+            pdf_icon_label.pack(pady=(20, 10))
+
+            # Show PDF file name
+            file_name = os.path.basename(pdf_path)
+            file_label = ctk.CTkLabel(frame, text=file_name, font=("Arial", 14))
+            file_label.pack(pady=(0, 10))
+
+            # Create preview area
+            preview_frame = ctk.CTkFrame(frame)
+            preview_frame.pack(expand=True, fill="both", padx=10, pady=10)
+
+            # Open PDF and show first page
+            doc = fitz.open(pdf_path)
+            page = doc[0]
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            photo = ImageTk.PhotoImage(img)
+
+            # Create label for preview
+            preview_label = ctk.CTkLabel(preview_frame, image=photo, text="")
+            preview_label.image = photo  # Keep a reference
+            preview_label.pack(expand=True, fill="both")
+
+            # Add page navigation
+            nav_frame = ctk.CTkFrame(preview_frame)
+            nav_frame.pack(fill="x", pady=5)
+
+            def prev_page():
+                nonlocal page, photo
+                if page.number > 0:
+                    page = doc[page.number - 1]
+                    pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    photo = ImageTk.PhotoImage(img)
+                    preview_label.configure(image=photo)
+                    preview_label.image = photo
+                    # Update page counter
+                    page_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
+
+            def next_page():
+                nonlocal page, photo
+                if page.number < len(doc) - 1:
+                    page = doc[page.number + 1]
+                    pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+                    img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                    photo = ImageTk.PhotoImage(img)
+                    preview_label.configure(image=photo)
+                    preview_label.image = photo
+                    # Update page counter
+                    page_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
+
+            prev_btn = ctk.CTkButton(nav_frame, text="←", width=30, command=prev_page)
+            prev_btn.pack(side="left", padx=5)
+
+            page_label = ctk.CTkLabel(nav_frame, text=f"Page {page.number + 1} of {len(doc)}")
+            page_label.pack(side="left", expand=True)
+
+            next_btn = ctk.CTkButton(nav_frame, text="→", width=30, command=next_page)
+            next_btn.pack(side="right", padx=5)
+
+            # Add remove button only for the right frame
+            if frame == right_frame:
+                def remove_pdf():
+                    path_var[0] = None
+                    show_drop_area(frame, path_var)
+
+                remove_btn = ctk.CTkButton(frame, text="Remove PDF", command=remove_pdf)
+                remove_btn.pack(pady=10)
+
+    # Function to show drop area
+    def show_drop_area(frame, path_var):
+        # Clear the frame
+        for widget in frame.winfo_children():
+            widget.destroy()
+
+        # Create drop area
+        drop_label = ctk.CTkLabel(frame, text="Drag and drop PDF here", font=("Arial", 16))
+        drop_label.pack(expand=True)
+
+        # Add select button
+        def select_pdf():
+            file_path = filedialog.askopenfilename(
+                filetypes=[("PDF files", "*.pdf")],
+                title="Select a PDF file"
+            )
+            if file_path:
+                path_var[0] = file_path
+                show_pdf_preview(frame, file_path, path_var)
+
+        select_btn = ctk.CTkButton(frame, text="Or select PDF", command=select_pdf)
+        select_btn.pack(pady=(0, 20))
+
+        # Enable drag and drop
+        frame.drop_target_register(DND_FILES)
+        
+        def handle_drop(event):
+            file_path = event.data.strip('{}')
+            if file_path.lower().endswith('.pdf'):
+                path_var[0] = file_path
+                show_pdf_preview(frame, file_path, path_var)
+            else:
+                messagebox.showwarning("Invalid File", "Please drop a PDF file")
+        
+        frame.dnd_bind('<<Drop>>', handle_drop)
+
+    # Initialize frames
+    show_pdf_preview(left_frame, pdf_path, left_pdf_path)  # Show original PDF on left
+    show_drop_area(right_frame, right_pdf_path)  # Show drop area on right
 
     def on_close():
         merge_win.destroy()
