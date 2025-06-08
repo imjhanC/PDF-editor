@@ -5,6 +5,8 @@ from tkinter import messagebox, filedialog
 import os
 from PIL import Image, ImageTk
 import fitz  # PyMuPDF
+import math
+import io
 
 def open_merge_screen(parent, pdf_path, show_pdf_screen):
     # Hide the parent window
@@ -185,6 +187,60 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
     left_pdf_path = [pdf_path]  # Use the original PDF path
     right_pdf_path = [None]
 
+    # Function to show all pages in tabs
+    def show_all_pages():
+        # Clear the main container
+        for widget in main_container.winfo_children():
+            widget.destroy()
+
+        # Create tabview
+        tabview = ctk.CTkTabview(main_container)
+        tabview.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Open both PDFs
+        doc1 = fitz.open(left_pdf_path[0])
+        doc2 = fitz.open(right_pdf_path[0])
+
+        # Create tabs for first PDF
+        for page_num in range(len(doc1)):
+            page = doc1[page_num]
+            tab_name = f"PDF1 - Page {page_num + 1}"
+            tabview.add(tab_name)
+            
+            # Create frame for the page
+            page_frame = ctk.CTkFrame(tabview.tab(tab_name))
+            page_frame.pack(expand=True, fill="both", padx=10, pady=10)
+            
+            # Convert page to image
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            photo = ImageTk.PhotoImage(img)
+            
+            # Create label for the page
+            page_label = ctk.CTkLabel(page_frame, image=photo, text="")
+            page_label.image = photo  # Keep a reference
+            page_label.pack(expand=True, fill="both")
+
+        # Create tabs for second PDF
+        for page_num in range(len(doc2)):
+            page = doc2[page_num]
+            tab_name = f"PDF2 - Page {page_num + 1}"
+            tabview.add(tab_name)
+            
+            # Create frame for the page
+            page_frame = ctk.CTkFrame(tabview.tab(tab_name))
+            page_frame.pack(expand=True, fill="both", padx=10, pady=10)
+            
+            # Convert page to image
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            photo = ImageTk.PhotoImage(img)
+            
+            # Create label for the page
+            page_label = ctk.CTkLabel(page_frame, image=photo, text="")
+            page_label.image = photo  # Keep a reference
+            page_label.pack(expand=True, fill="both")
+
     # Function to show PDF preview
     def show_pdf_preview(frame, pdf_path, path_var):
         # Clear the frame
@@ -256,12 +312,32 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
 
             # Add remove button only for the right frame
             if frame == right_frame:
+                # Create a frame for buttons
+                button_frame = ctk.CTkFrame(frame)
+                button_frame.pack(pady=10)
+
                 def remove_pdf():
                     path_var[0] = None
                     show_drop_area(frame, path_var)
+                    # Hide confirm button if it exists
+                    if hasattr(button_frame, 'confirm_button'):
+                        button_frame.confirm_button.pack_forget()
 
-                remove_btn = ctk.CTkButton(frame, text="Remove PDF", command=remove_pdf)
-                remove_btn.pack(pady=10)
+                remove_btn = ctk.CTkButton(button_frame, text="Remove PDF", command=remove_pdf)
+                remove_btn.pack(side="left", padx=5)
+
+                # Show confirm button if both PDFs are present
+                if left_pdf_path[0] and right_pdf_path[0]:
+                    if not hasattr(button_frame, 'confirm_button'):
+                        confirm_button = ctk.CTkButton(
+                            button_frame,
+                            text="Confirm",
+                            command=show_all_pages,
+                            fg_color=("red", "red"),
+                            hover_color=("darkred", "darkred")
+                        )
+                        confirm_button.pack(side="left", padx=5)
+                        button_frame.confirm_button = confirm_button
 
     # Function to show drop area
     def show_drop_area(frame, path_var):
