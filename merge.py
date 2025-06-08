@@ -192,12 +192,12 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
     right_pages = []  # Will store page data for right PDF
 
     # Function to create draggable page thumbnail
-    def create_page_thumbnail(page, scale=0.3):
+    def create_page_thumbnail(page, scale=0.2):
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
         img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
         return ImageTk.PhotoImage(img)
 
-    # Function to show pages in tabs for each PDF
+    # Function to show pages in horizontal grid layout
     def show_pages_in_tabs():
         # Clear the main container
         for widget in main_container.winfo_children():
@@ -211,11 +211,157 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         right_main_frame.pack(side="right", expand=True, fill="both", padx=(5, 0))
 
         # Add titles
-        left_title = ctk.CTkLabel(left_main_frame, text="PDF 1", font=ctk.CTkFont(size=16, weight="bold"))
-        left_title.pack(pady=(10, 5))
+        left_title_frame = ctk.CTkFrame(left_main_frame, fg_color="transparent")
+        left_title_frame.pack(fill="x", pady=(10, 5))
+
+        # Use a sub-frame to center the title and button for PDF 1
+        center_frame_pdf1 = ctk.CTkFrame(left_title_frame, fg_color="transparent")
+        center_frame_pdf1.pack(expand=True)
+
+        left_title = ctk.CTkLabel(center_frame_pdf1, text="PDF 1", font=ctk.CTkFont(size=16, weight="bold"))
+        left_title.pack(side="left", padx=(0, 10))
+
+        def replace_pdf1():
+            # Create confirmation dialog
+            confirm_dialog = ctk.CTkToplevel(merge_win)
+            confirm_dialog.title("Confirm Replace")
+            confirm_dialog.geometry("400x200")
+            confirm_dialog.transient(merge_win)
+            confirm_dialog.grab_set()
+
+            # Center the dialog
+            confirm_dialog.update_idletasks()
+            x = merge_win.winfo_x() + (merge_win.winfo_width() - confirm_dialog.winfo_width()) // 2
+            y = merge_win.winfo_y() + (merge_win.winfo_height() - confirm_dialog.winfo_height()) // 2
+            confirm_dialog.geometry(f"+{x}+{y}")
+
+            # Add message
+            msg_label = ctk.CTkLabel(
+                confirm_dialog,
+                text="Do you want to replace the current PDF 1?",
+                wraplength=350,
+                font=ctk.CTkFont(size=14)
+            )
+            msg_label.pack(pady=(30, 20))
+
+            # Add buttons
+            button_frame = ctk.CTkFrame(confirm_dialog)
+            button_frame.pack(pady=(0, 20))
+
+            def on_confirm():
+                confirm_dialog.destroy()
+                # Open file dialog to select new PDF
+                file_path = filedialog.askopenfilename(
+                    filetypes=[("PDF files", "*.pdf")],
+                    title="Select a PDF file"
+                )
+                if file_path:
+                    left_pdf_path[0] = file_path
+                    show_pages_in_tabs()  # Reload the view with new PDF
+
+            def on_cancel():
+                confirm_dialog.destroy()
+
+            confirm_btn = ctk.CTkButton(
+                button_frame,
+                text="Yes, Replace",
+                command=on_confirm
+            )
+            confirm_btn.pack(side="left", padx=10)
+
+            cancel_btn = ctk.CTkButton(
+                button_frame,
+                text="Cancel",
+                command=on_cancel
+            )
+            cancel_btn.pack(side="left", padx=10)
+
+            # Wait for dialog to close
+            merge_win.wait_window(confirm_dialog)
+
+        replace_btn_pdf1 = ctk.CTkButton(
+            center_frame_pdf1,
+            text="Replace PDF",
+            width=100,
+            command=replace_pdf1
+        )
+        replace_btn_pdf1.pack(side="left")
         
-        right_title = ctk.CTkLabel(right_main_frame, text="PDF 2", font=ctk.CTkFont(size=16, weight="bold"))
-        right_title.pack(pady=(10, 5))
+        right_title_frame = ctk.CTkFrame(right_main_frame, fg_color="transparent")
+        right_title_frame.pack(fill="x", pady=(10, 5))
+        
+        # Use a sub-frame to center the title and button
+        center_frame = ctk.CTkFrame(right_title_frame, fg_color="transparent")
+        center_frame.pack(expand=True)
+        
+        right_title = ctk.CTkLabel(center_frame, text="PDF 2", font=ctk.CTkFont(size=16, weight="bold"))
+        right_title.pack(side="left", padx=(0, 10))
+        
+        def replace_pdf2():
+            # Create confirmation dialog
+            confirm_dialog = ctk.CTkToplevel(merge_win)
+            confirm_dialog.title("Confirm Replace")
+            confirm_dialog.geometry("400x200")
+            confirm_dialog.transient(merge_win)
+            confirm_dialog.grab_set()
+
+            # Center the dialog
+            confirm_dialog.update_idletasks()
+            x = merge_win.winfo_x() + (merge_win.winfo_width() - confirm_dialog.winfo_width()) // 2
+            y = merge_win.winfo_y() + (merge_win.winfo_height() - confirm_dialog.winfo_height()) // 2
+            confirm_dialog.geometry(f"+{x}+{y}")
+
+            # Add message
+            msg_label = ctk.CTkLabel(
+                confirm_dialog,
+                text="Do you want to replace the current PDF 2?",
+                wraplength=350,
+                font=ctk.CTkFont(size=14)
+            )
+            msg_label.pack(pady=(30, 20))
+
+            # Add buttons
+            button_frame = ctk.CTkFrame(confirm_dialog)
+            button_frame.pack(pady=(0, 20))
+
+            def on_confirm():
+                confirm_dialog.destroy()
+                # Open file dialog to select new PDF
+                file_path = filedialog.askopenfilename(
+                    filetypes=[("PDF files", "*.pdf")],
+                    title="Select a PDF file"
+                )
+                if file_path:
+                    right_pdf_path[0] = file_path
+                    show_pages_in_tabs()  # Reload the view with new PDF
+
+            def on_cancel():
+                confirm_dialog.destroy()
+
+            confirm_btn = ctk.CTkButton(
+                button_frame,
+                text="Yes, Replace",
+                command=on_confirm
+            )
+            confirm_btn.pack(side="left", padx=10)
+
+            cancel_btn = ctk.CTkButton(
+                button_frame,
+                text="Cancel",
+                command=on_cancel
+            )
+            cancel_btn.pack(side="left", padx=10)
+
+            # Wait for dialog to close
+            merge_win.wait_window(confirm_dialog)
+
+        replace_btn = ctk.CTkButton(
+            center_frame,
+            text="Replace PDF",
+            width=100,
+            command=replace_pdf2
+        )
+        replace_btn.pack(side="left")
 
         # Create scrollable frames for page thumbnails
         left_scroll = ctk.CTkScrollableFrame(left_main_frame)
@@ -232,83 +378,113 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         left_pages.clear()
         right_pages.clear()
 
-        # Create page items for left PDF
+        # Calculate grid layout parameters
+        thumbnail_width = 120
+        thumbnail_height = 150
+        padding = 10
+        
+        # Get the width of the scrollable frame to calculate columns
+        left_scroll.update_idletasks()
+        available_width = left_scroll.winfo_width() - 40  # Account for padding
+        columns_per_row = max(1, available_width // (thumbnail_width + padding))
+
+        # Create horizontal grid layout for left PDF
+        current_row_frame = None
+        current_column = 0
+        
         for page_num in range(len(doc1)):
             page = doc1[page_num]
             left_pages.append({'doc': doc1, 'page_num': page_num, 'original_pdf': 'left'})
             
+            # Create new row frame if needed
+            if current_column == 0:
+                current_row_frame = ctk.CTkFrame(left_scroll, fg_color="transparent")
+                current_row_frame.pack(fill="x", pady=2)
+            
             # Create page frame
-            page_frame = ctk.CTkFrame(left_scroll)
-            page_frame.pack(fill="x", pady=5, padx=5)
+            page_frame = ctk.CTkFrame(current_row_frame, width=thumbnail_width, height=thumbnail_height)
+            page_frame.pack(side="left", padx=padding//2, pady=5)
+            page_frame.pack_propagate(False)  # Maintain fixed size
             
             # Create thumbnail
             thumbnail = create_page_thumbnail(page)
             
-            # Create page label with drag functionality
-            page_label = ctk.CTkLabel(
+            # Create image label
+            image_label = ctk.CTkLabel(
                 page_frame, 
                 image=thumbnail, 
-                text=f"Page {page_num + 1}",
-                compound="top",
-                font=ctk.CTkFont(size=12)
+                text="",
             )
-            page_label.image = thumbnail  # Keep reference
-            page_label.pack(pady=5)
+            image_label.image = thumbnail  # Keep reference
+            image_label.pack(expand=True, fill="both", pady=(5,0))
             
-            # Make the page draggable
-            page_label.bind("<Button-1>", lambda e, pn=page_num, src='left': start_drag(e, pn, src))
-            page_label.bind("<B1-Motion>", lambda e, pn=page_num, src='left': on_drag(e, pn, src))
-            page_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='left': end_drag(e, pn, src))
+            # Create page number label
+            page_number_label = ctk.CTkLabel(
+                page_frame, 
+                text=f"Page {page_num + 1}",
+                font=ctk.CTkFont(size=10)
+            )
+            page_number_label.pack(pady=(0,5))
+            
+            # Make the page draggable (bind to the image_label)
+            image_label.bind("<Button-1>", lambda e, pn=page_num, src='left': start_drag(e, pn, src))
+            image_label.bind("<B1-Motion>", lambda e, pn=page_num, src='left': on_drag(e, pn, src))
+            image_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='left': end_drag(e, pn, src))
 
-        # Create page items for right PDF
+            current_column += 1
+            if current_column >= columns_per_row:
+                current_column = 0
+
+        # Create horizontal grid layout for right PDF
+        current_row_frame = None
+        current_column = 0
+        
         for page_num in range(len(doc2)):
             page = doc2[page_num]
             right_pages.append({'doc': doc2, 'page_num': page_num, 'original_pdf': 'right'})
             
+            # Create new row frame if needed
+            if current_column == 0:
+                current_row_frame = ctk.CTkFrame(right_scroll, fg_color="transparent")
+                current_row_frame.pack(fill="x", pady=2)
+            
             # Create page frame
-            page_frame = ctk.CTkFrame(right_scroll)
-            page_frame.pack(fill="x", pady=5, padx=5)
+            page_frame = ctk.CTkFrame(current_row_frame, width=thumbnail_width, height=thumbnail_height)
+            page_frame.pack(side="left", padx=padding//2, pady=5)
+            page_frame.pack_propagate(False)  # Maintain fixed size
             
             # Create thumbnail
             thumbnail = create_page_thumbnail(page)
             
-            # Create page label with drag functionality
-            page_label = ctk.CTkLabel(
+            # Create image label
+            image_label = ctk.CTkLabel(
                 page_frame, 
                 image=thumbnail, 
-                text=f"Page {page_num + 1}",
-                compound="top",
-                font=ctk.CTkFont(size=12)
+                text="",
             )
-            page_label.image = thumbnail  # Keep reference
-            page_label.pack(pady=5)
+            image_label.image = thumbnail  # Keep reference
+            image_label.pack(expand=True, fill="both", pady=(5,0))
             
-            # Make the page draggable
-            page_label.bind("<Button-1>", lambda e, pn=page_num, src='right': start_drag(e, pn, src))
-            page_label.bind("<B1-Motion>", lambda e, pn=page_num, src='right': on_drag(e, pn, src))
-            page_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='right': end_drag(e, pn, src))
+            # Create page number label
+            page_number_label = ctk.CTkLabel(
+                page_frame, 
+                text=f"Page {page_num + 1}",
+                font=ctk.CTkFont(size=10)
+            )
+            page_number_label.pack(pady=(0,5))
+            
+            # Make the page draggable (bind to the image_label)
+            image_label.bind("<Button-1>", lambda e, pn=page_num, src='right': start_drag(e, pn, src))
+            image_label.bind("<B1-Motion>", lambda e, pn=page_num, src='right': on_drag(e, pn, src))
+            image_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='right': end_drag(e, pn, src))
+
+            current_column += 1
+            if current_column >= columns_per_row:
+                current_column = 0
 
         # Enable drop zones for both scrollable frames
         left_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'left'))
         right_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'right'))
-
-        # Add action buttons
-        action_frame = ctk.CTkFrame(main_container)
-        action_frame.pack(fill="x", pady=(10, 0))
-
-        def save_merged_pdf():
-            # Implementation for saving the merged PDF
-            messagebox.showinfo("Save", "Save functionality will be implemented here")
-
-        def reset_pages():
-            # Reset to original state
-            show_pages_in_tabs()
-
-        save_btn = ctk.CTkButton(action_frame, text="Save Merged PDF", command=save_merged_pdf)
-        save_btn.pack(side="left", padx=10, pady=10)
-
-        reset_btn = ctk.CTkButton(action_frame, text="Reset", command=reset_pages)
-        reset_btn.pack(side="left", padx=10, pady=10)
 
     # Drag and drop functionality
     drag_data = {'dragging': False, 'page_num': None, 'source': None, 'widget': None}
@@ -393,7 +569,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                     preview_label.configure(image=photo)
                     preview_label.image = photo
                     # Update page counter
-                    page_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
+                    page_number_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
 
             def next_page():
                 nonlocal page, photo
@@ -405,13 +581,13 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                     preview_label.configure(image=photo)
                     preview_label.image = photo
                     # Update page counter
-                    page_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
+                    page_number_label.configure(text=f"Page {page.number + 1} of {len(doc)}")
 
             prev_btn = ctk.CTkButton(nav_frame, text="←", width=30, command=prev_page)
             prev_btn.pack(side="left", padx=5)
 
-            page_label = ctk.CTkLabel(nav_frame, text=f"Page {page.number + 1} of {len(doc)}")
-            page_label.pack(side="left", expand=True)
+            page_number_label = ctk.CTkLabel(nav_frame, text=f"Page {page.number + 1} of {len(doc)}")
+            page_number_label.pack(side="left", expand=True)
 
             next_btn = ctk.CTkButton(nav_frame, text="→", width=30, command=next_page)
             next_btn.pack(side="right", padx=5)
