@@ -128,7 +128,63 @@ def open_split_screen(parent, pdf_path, show_pdf_screen):
     menu_bar.add_command(label="New", command=new_pdf)
 
     # Exit menu
-    menu_bar.add_command(label="Exit", command=split_win.destroy)
+    def exit_app():
+        # Create custom confirmation dialog
+        confirm_dialog = ctk.CTkToplevel(split_win)
+        confirm_dialog.title("Confirm Exit")
+        confirm_dialog.geometry("400x200")
+        confirm_dialog.transient(split_win)
+        confirm_dialog.grab_set()
+
+        # Center the dialog
+        confirm_dialog.update_idletasks()
+        x = split_win.winfo_x() + (split_win.winfo_width() - confirm_dialog.winfo_width()) // 2
+        y = split_win.winfo_y() + (split_win.winfo_height() - confirm_dialog.winfo_height()) // 2
+        confirm_dialog.geometry(f"+{x}+{y}")
+
+        # Add message
+        msg_label = ctk.CTkLabel(
+            confirm_dialog,
+            text="Are you sure you want to exit the application?",
+            wraplength=350,
+            font=ctk.CTkFont(size=14)
+        )
+        msg_label.pack(pady=(30, 20))
+
+        # Add buttons
+        button_frame = ctk.CTkFrame(confirm_dialog)
+        button_frame.pack(pady=(0, 20))
+
+        def on_confirm():
+            confirm_dialog.destroy()
+            # Close the PDF document
+            pdf_document.close()
+            # Close the split screen window
+            split_win.destroy()
+            # Close the parent window (main application)
+            parent.destroy()
+
+        def on_cancel():
+            confirm_dialog.destroy()
+
+        confirm_btn = ctk.CTkButton(
+            button_frame,
+            text="Yes, Exit",
+            command=on_confirm
+        )
+        confirm_btn.pack(side="left", padx=10)
+
+        cancel_btn = ctk.CTkButton(
+            button_frame,
+            text="Cancel",
+            command=on_cancel
+        )
+        cancel_btn.pack(side="left", padx=10)
+
+        # Wait for dialog to close
+        split_win.wait_window(confirm_dialog)
+
+    menu_bar.add_command(label="Exit", command=exit_app)
 
     # Configure menu colors
     menu_bar.configure(

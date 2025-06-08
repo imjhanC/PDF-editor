@@ -5,6 +5,7 @@ from tkinter import messagebox, filedialog
 import os
 from PIL import Image, ImageTk
 from split import open_split_screen
+from merge import open_merge_screen
 
 # Set the appearance mode and default color theme
 ctk.set_appearance_mode("dark")
@@ -88,7 +89,7 @@ def show_pdf_screen(pdf_path):
     button_frame.pack(pady=(0, 10), fill="x", padx=40)
     split_button = ctk.CTkButton(button_frame, text="Split", command=lambda: open_split_screen(app, pdf_path, show_pdf_screen))
     split_button.pack(side="left", expand=True, fill="x", padx=(0, 10))
-    merge_button = ctk.CTkButton(button_frame, text="Merge")
+    merge_button = ctk.CTkButton(button_frame, text="Merge", command=lambda: open_merge_screen(app, pdf_path, show_pdf_screen))
     merge_button.pack(side="right", expand=True, fill="x", padx=(10, 0))
 
 # Update handlers to show the PDF screen
