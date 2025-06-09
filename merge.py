@@ -44,8 +44,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                        bg='#2b2b2b',
                        fg='white',
                        activebackground='#404040',
-                       activeforeground='white')
-    menu_bar.add_cascade(label="File", menu=file_menu)
+                       activeforeground='black')
 
     # New menu
     def new_pdf():
@@ -419,9 +418,9 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 })
 
         # Calculate grid layout parameters
-        thumbnail_width = 120
-        thumbnail_height = 190  # Increased height to accommodate page number
-        padding = 10
+        thumbnail_width = 170 #120
+        thumbnail_height = 190  # Increased height to accommodate page number  190
+        padding = 10 #10
         
         # Get the width of the scrollable frame to calculate columns
         left_scroll.update_idletasks()
@@ -571,7 +570,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             # Open PDF and show first page
             doc = fitz.open(pdf_path)
             page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6)) # 0.5, 0.5
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             photo = ImageTk.PhotoImage(img)
 
@@ -588,7 +587,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 nonlocal page, photo
                 if page.number > 0:
                     page = doc[page.number - 1]
-                    pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+                    pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6))
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                     photo = ImageTk.PhotoImage(img)
                     preview_label.configure(image=photo)
@@ -600,7 +599,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 nonlocal page, photo
                 if page.number < len(doc) - 1:
                     page = doc[page.number + 1]
-                    pix = page.get_pixmap(matrix=fitz.Matrix(0.5, 0.5))
+                    pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6))
                     img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
                     photo = ImageTk.PhotoImage(img)
                     preview_label.configure(image=photo)
