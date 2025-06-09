@@ -200,6 +200,22 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             if page_data in selected_pages:
                 selected_pages.remove(page_data)
 
+    # Function to handle arrow button click
+    def handle_arrow_click():
+        """Handle the arrow button click - check if pages are selected"""
+        if not selected_pages:
+            # Show message box if no pages are selected
+            messagebox.showwarning(
+                "No Pages Selected", 
+                "Please select at least one PDF page before proceeding.",
+                parent=merge_win
+            )
+        else:
+            # TODO: Add your logic here for what happens when pages are selected
+            # For now, just show a message with the count of selected pages
+            from merge_final import open_merge_final_screen
+            open_merge_final_screen(merge_win, selected_pages.copy())
+
     # Function to create draggable page thumbnail
     def create_page_thumbnail(page, scale=0.2):
         pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale))
@@ -517,6 +533,20 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             current_column += 1
             if current_column >= columns_per_row:
                 current_column = 0
+
+        # Add the arrow button at bottom right corner overlapping PDF 2 frame
+        arrow_button = ctk.CTkButton(
+            right_main_frame,
+            text="→",
+            width=50,
+            height=50,
+            font=ctk.CTkFont(size=20, weight="bold"),
+            command=handle_arrow_click,
+            fg_color=("#1f538d", "#14375e"),
+            hover_color=("#144870", "#1f538d")
+        )
+        # Place the button at bottom right corner with some padding from edges
+        arrow_button.place(relx=1.0, rely=1.0, anchor="se", x=-30, y=-30)
 
     # Function to show PDF preview
     def show_pdf_preview(frame, pdf_path, path_var):
