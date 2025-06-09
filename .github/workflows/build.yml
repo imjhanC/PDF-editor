@@ -28,7 +28,7 @@ jobs:
         pip install pyinstaller
     
     - name: Build EXE (with tkinter fixes)
-      run: pyinstaller --onefile --noconsole main.py --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --collect-all tkinter --name main
+      run: pyinstaller --onefile --noconsole main.py --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --collect-all TkinterDnD2 --name main
     
     - name: Upload EXE to release
       uses: softprops/action-gh-release@v1
