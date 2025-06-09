@@ -3,11 +3,10 @@ name: Build EXE and Create Release
 on:
   push:
     tags:
-      - 'v*'  # Only triggers on version tags like v1.0
+      - 'v*'
 
-# Add permissions block
 permissions:
-  contents: write  # This is required for creating releases
+  contents: write
 
 jobs:
   build:
@@ -27,8 +26,10 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
     
-    - name: Build EXE (with tkinter fixes)
-      run: pyinstaller --onefile --noconsole main.py --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --collect-all TkinterDnD2 --name main
+    - name: Get TkinterDnD2 path and build
+      run: |
+        $tkdnd_path = python -c "import tkinterdnd2; import os; print(os.path.join(os.path.dirname(tkinterdnd2.__file__), 'tkdnd'))"
+        pyinstaller --onefile --noconsole main.py --hidden-import=tkinter --hidden-import=tkinter.ttk --hidden-import=tkinter.messagebox --hidden-import=tkinter.filedialog --hidden-import=tkinterdnd2 --collect-all tkinter --collect-all tkinterdnd2 --add-data="$tkdnd_path;tkdnd" --name main
     
     - name: Upload EXE to release
       uses: softprops/action-gh-release@v1
