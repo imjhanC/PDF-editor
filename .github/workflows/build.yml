@@ -27,8 +27,13 @@ jobs:
         pip install -r requirements.txt
         pip install pyinstaller
 
+    - name: Copy PyInstaller hook for tkinterdnd2
+      run: |
+        $tkinterdnd2_path = (python -c "import os; import tkinterdnd2; print(os.path.dirname(tkinterdnd2.__file__))").Trim()
+        Copy-Item -Path "$tkinterdnd2_path\hook-tkinterdnd2.py" -Destination ".\" -Force
+
     - name: Build EXE (no console)
-      run: pyinstaller --onefile --noconsole main.py
+      run: pyinstaller --onefile --noconsole main.py --additional-hooks-dir=.
 
     - name: Upload EXE to release
       uses: softprops/action-gh-release@v1
