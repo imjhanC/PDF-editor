@@ -190,6 +190,15 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
     # Global variables for page management
     left_pages = []  # Will store page data for left PDF
     right_pages = []  # Will store page data for right PDF
+    selected_pages = []  # Store selected pages
+
+    def toggle_page_selection(page_data, var):
+        """Toggle page selection and update the selected_pages list"""
+        if var.get():
+            selected_pages.append(page_data)
+        else:
+            if page_data in selected_pages:
+                selected_pages.remove(page_data)
 
     # Function to create draggable page thumbnail
     def create_page_thumbnail(page, scale=0.2):
@@ -374,13 +383,28 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         doc1 = fitz.open(left_pdf_path[0])
         doc2 = fitz.open(right_pdf_path[0])
 
-        # Clear previous page data
-        left_pages.clear()
-        right_pages.clear()
+        # Clear previous page data only if it's empty (first time loading)
+        if not left_pages:
+            for page_num in range(len(doc1)):
+                left_pages.append({
+                    'doc': doc1, 
+                    'page_num': page_num, 
+                    'original_pdf': 'left',
+                    'display_index': len(left_pages)  # Track display order
+                })
+        
+        if not right_pages:
+            for page_num in range(len(doc2)):
+                right_pages.append({
+                    'doc': doc2, 
+                    'page_num': page_num, 
+                    'original_pdf': 'right',
+                    'display_index': len(right_pages)  # Track display order
+                })
 
         # Calculate grid layout parameters
         thumbnail_width = 120
-        thumbnail_height = 150
+        thumbnail_height = 190  # Increased height to accommodate page number
         padding = 10
         
         # Get the width of the scrollable frame to calculate columns
@@ -392,9 +416,8 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         current_row_frame = None
         current_column = 0
         
-        for page_num in range(len(doc1)):
-            page = doc1[page_num]
-            left_pages.append({'doc': doc1, 'page_num': page_num, 'original_pdf': 'left'})
+        for display_index, page_data in enumerate(left_pages):
+            page = page_data['doc'][page_data['page_num']]
             
             # Create new row frame if needed
             if current_column == 0:
@@ -418,18 +441,25 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             image_label.image = thumbnail  # Keep reference
             image_label.pack(expand=True, fill="both", pady=(5,0))
             
-            # Create page number label
+            # Create page number label - Show original page number
             page_number_label = ctk.CTkLabel(
                 page_frame, 
-                text=f"Page {page_num + 1}",
+                text=f"Page {page_data['page_num'] + 1}",
                 font=ctk.CTkFont(size=10)
             )
             page_number_label.pack(pady=(0,5))
-            
-            # Make the page draggable (bind to the image_label)
-            image_label.bind("<Button-1>", lambda e, pn=page_num, src='left': start_drag(e, pn, src))
-            image_label.bind("<B1-Motion>", lambda e, pn=page_num, src='left': on_drag(e, pn, src))
-            image_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='left': end_drag(e, pn, src))
+
+            # Add checkbox for page selection
+            is_selected = ctk.BooleanVar(value=page_data in selected_pages)
+            checkbox = ctk.CTkCheckBox(
+                page_frame,
+                text="",
+                variable=is_selected,
+                command=lambda pd=page_data, var=is_selected: toggle_page_selection(pd, var),
+                width=20,
+                height=20
+            )
+            checkbox.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
 
             current_column += 1
             if current_column >= columns_per_row:
@@ -439,9 +469,8 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         current_row_frame = None
         current_column = 0
         
-        for page_num in range(len(doc2)):
-            page = doc2[page_num]
-            right_pages.append({'doc': doc2, 'page_num': page_num, 'original_pdf': 'right'})
+        for display_index, page_data in enumerate(right_pages):
+            page = page_data['doc'][page_data['page_num']]
             
             # Create new row frame if needed
             if current_column == 0:
@@ -465,63 +494,29 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             image_label.image = thumbnail  # Keep reference
             image_label.pack(expand=True, fill="both", pady=(5,0))
             
-            # Create page number label
+            # Create page number label - Show original page number
             page_number_label = ctk.CTkLabel(
                 page_frame, 
-                text=f"Page {page_num + 1}",
+                text=f"Page {page_data['page_num'] + 1}",
                 font=ctk.CTkFont(size=10)
             )
             page_number_label.pack(pady=(0,5))
-            
-            # Make the page draggable (bind to the image_label)
-            image_label.bind("<Button-1>", lambda e, pn=page_num, src='right': start_drag(e, pn, src))
-            image_label.bind("<B1-Motion>", lambda e, pn=page_num, src='right': on_drag(e, pn, src))
-            image_label.bind("<ButtonRelease-1>", lambda e, pn=page_num, src='right': end_drag(e, pn, src))
+
+            # Add checkbox for page selection
+            is_selected = ctk.BooleanVar(value=page_data in selected_pages)
+            checkbox = ctk.CTkCheckBox(
+                page_frame,
+                text="",
+                variable=is_selected,
+                command=lambda pd=page_data, var=is_selected: toggle_page_selection(pd, var),
+                width=20,
+                height=20
+            )
+            checkbox.place(relx=1.0, rely=0.0, anchor="ne", x=-2, y=2)
 
             current_column += 1
             if current_column >= columns_per_row:
                 current_column = 0
-
-        # Enable drop zones for both scrollable frames
-        left_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'left'))
-        right_scroll.bind("<Button-1>", lambda e: handle_drop_to_frame(e, 'right'))
-
-    # Drag and drop functionality
-    drag_data = {'dragging': False, 'page_num': None, 'source': None, 'widget': None}
-
-    def start_drag(event, page_num, source):
-        drag_data['dragging'] = True
-        drag_data['page_num'] = page_num
-        drag_data['source'] = source
-        drag_data['widget'] = event.widget
-        # Change cursor to indicate dragging
-        event.widget.configure(cursor="hand2")
-
-    def on_drag(event, page_num, source):
-        if drag_data['dragging']:
-            # Visual feedback during drag (optional)
-            pass
-
-    def end_drag(event, page_num, source):
-        if drag_data['dragging']:
-            # Reset cursor
-            event.widget.configure(cursor="")
-            drag_data['dragging'] = False
-            
-    def handle_drop_to_frame(event, target_frame):
-        if drag_data['dragging'] and drag_data['source'] != target_frame:
-            # Move page from source to target
-            source_pages = left_pages if drag_data['source'] == 'left' else right_pages
-            target_pages = left_pages if target_frame == 'left' else right_pages
-            
-            # Get the page data
-            page_data = source_pages.pop(drag_data['page_num'])
-            target_pages.append(page_data)
-            
-            messagebox.showinfo("Page Moved", f"Page {drag_data['page_num'] + 1} moved from {drag_data['source']} to {target_frame}")
-            
-            # Refresh the display
-            show_pages_in_tabs()
 
     # Function to show PDF preview
     def show_pdf_preview(frame, pdf_path, path_var):
