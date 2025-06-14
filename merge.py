@@ -23,7 +23,7 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
 
     # Calculate position for center of the screen
     window_width = 1300
-    window_height = 768
+    window_height = 800
     x_position = (screen_width - window_width) // 2
     y_position = (screen_height - window_height) // 2
 
@@ -276,12 +276,23 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 confirm_dialog.destroy()
                 # Open file dialog to select new PDF
                 file_path = filedialog.askopenfilename(
-                    filetypes=[("PDF files", "*.pdf")],
-                    title="Select a PDF file"
+                    filetypes=[
+                        ("PDF and Image files", "*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.gif"),
+                        ("PDF files", "*.pdf"),
+                        ("Image files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")
+                    ],
+                    title="Select a PDF or Image file"
                 )
                 if file_path:
-                    left_pdf_path[0] = file_path
-                    show_pages_in_tabs()  # Reload the view with new PDF
+                    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                        # Convert image to PDF
+                        pdf_bytes = convert_image_to_pdf(file_path)
+                        if pdf_bytes:
+                            left_pdf_path[0] = file_path
+                            show_pages_in_tabs()  # Reload the view with new PDF
+                    else:
+                        left_pdf_path[0] = file_path
+                        show_pages_in_tabs()  # Reload the view with new PDF
 
             def on_cancel():
                 confirm_dialog.destroy()
@@ -352,12 +363,23 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
                 confirm_dialog.destroy()
                 # Open file dialog to select new PDF
                 file_path = filedialog.askopenfilename(
-                    filetypes=[("PDF files", "*.pdf")],
-                    title="Select a PDF file"
+                    filetypes=[
+                        ("PDF and Image files", "*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.gif"),
+                        ("PDF files", "*.pdf"),
+                        ("Image files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")
+                    ],
+                    title="Select a PDF or Image file"
                 )
                 if file_path:
-                    right_pdf_path[0] = file_path
-                    show_pages_in_tabs()  # Reload the view with new PDF
+                    if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                        # Convert image to PDF
+                        pdf_bytes = convert_image_to_pdf(file_path)
+                        if pdf_bytes:
+                            right_pdf_path[0] = file_path
+                            show_pages_in_tabs()  # Reload the view with new PDF
+                    else:
+                        right_pdf_path[0] = file_path
+                        show_pages_in_tabs()  # Reload the view with new PDF
 
             def on_cancel():
                 confirm_dialog.destroy()
@@ -395,8 +417,23 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
         right_scroll.pack(expand=True, fill="both", padx=10, pady=10)
 
         # Open both PDFs and load pages
-        doc1 = fitz.open(left_pdf_path[0])
-        doc2 = fitz.open(right_pdf_path[0])
+        if isinstance(left_pdf_path[0], str) and left_pdf_path[0].lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+            # Convert image to PDF if it's an image file
+            rotation = getattr(left_frame, 'rotation_state', 0)  # Get rotation state from frame
+            pdf_bytes = convert_image_to_pdf(left_pdf_path[0], rotation)
+            if pdf_bytes:
+                doc1 = fitz.open(stream=pdf_bytes, filetype="pdf")
+        else:
+            doc1 = fitz.open(left_pdf_path[0])
+
+        if isinstance(right_pdf_path[0], str) and right_pdf_path[0].lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+            # Convert image to PDF if it's an image file
+            rotation = getattr(right_frame, 'rotation_state', 0)  # Get rotation state from frame
+            pdf_bytes = convert_image_to_pdf(right_pdf_path[0], rotation)
+            if pdf_bytes:
+                doc2 = fitz.open(stream=pdf_bytes, filetype="pdf")
+        else:
+            doc2 = fitz.open(right_pdf_path[0])
 
         # Clear previous page data only if it's empty (first time loading)
         if not left_pages:
@@ -559,7 +596,11 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             pdf_icon_label.pack(pady=(20, 10))
 
             # Show PDF file name
-            file_name = os.path.basename(pdf_path)
+            if isinstance(pdf_path, io.BytesIO):
+                # For in-memory PDFs, use the original image path stored in path_var
+                file_name = os.path.basename(path_var[0])
+            else:
+                file_name = os.path.basename(pdf_path)
             file_label = ctk.CTkLabel(frame, text=file_name, font=("Arial", 14))
             file_label.pack(pady=(0, 10))
 
@@ -568,9 +609,13 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             preview_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
             # Open PDF and show first page
-            doc = fitz.open(pdf_path)
+            if isinstance(pdf_path, io.BytesIO):
+                doc = fitz.open(stream=pdf_path, filetype="pdf")
+            else:
+                doc = fitz.open(pdf_path)
+            
             page = doc[0]
-            pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6)) # 0.5, 0.5
+            pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6))
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             photo = ImageTk.PhotoImage(img)
 
@@ -579,9 +624,49 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             preview_label.image = photo  # Keep a reference
             preview_label.pack(expand=True, fill="both")
 
+            # Create a container for all controls
+            controls_frame = ctk.CTkFrame(frame)
+            controls_frame.pack(fill="x", pady=10)
+
+            # Add rotation controls if it's an image
+            if file_name.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                rotation_frame = ctk.CTkFrame(controls_frame)
+                rotation_frame.pack(fill="x", pady=(0, 5))
+
+                # Initialize rotation state if not exists
+                if not hasattr(frame, 'rotation_state'):
+                    frame.rotation_state = 0
+
+                def rotate_image(direction):
+                    nonlocal doc, page, photo
+                    # Update rotation angle
+                    if direction == 'clockwise':
+                        frame.rotation_state = (frame.rotation_state + 90) % 360
+                    else:
+                        frame.rotation_state = (frame.rotation_state - 90) % 360
+
+                    # Convert image to PDF with new rotation
+                    pdf_bytes = convert_image_to_pdf(path_var[0], frame.rotation_state)
+                    if pdf_bytes:
+                        # Update preview
+                        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+                        page = doc[0]
+                        pix = page.get_pixmap(matrix=fitz.Matrix(0.6, 0.6))
+                        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                        photo = ImageTk.PhotoImage(img)
+                        preview_label.configure(image=photo)
+                        preview_label.image = photo
+
+                # Add rotation buttons
+                rotate_left_btn = ctk.CTkButton(rotation_frame, text="↺", width=30, command=lambda: rotate_image('anticlockwise'))
+                rotate_left_btn.pack(side="left", padx=5)
+
+                rotate_right_btn = ctk.CTkButton(rotation_frame, text="↻", width=30, command=lambda: rotate_image('clockwise'))
+                rotate_right_btn.pack(side="right", padx=5)
+
             # Add page navigation
-            nav_frame = ctk.CTkFrame(preview_frame)
-            nav_frame.pack(fill="x", pady=5)
+            nav_frame = ctk.CTkFrame(controls_frame)
+            nav_frame.pack(fill="x", pady=(0, 5))
 
             def prev_page():
                 nonlocal page, photo
@@ -616,29 +701,35 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             next_btn = ctk.CTkButton(nav_frame, text="→", width=30, command=next_page)
             next_btn.pack(side="right", padx=5)
 
-            # Add remove button only for the right frame
+            # Add action buttons (remove and confirm)
             if frame == right_frame:
-                # Create a frame for buttons
-                button_frame = ctk.CTkFrame(frame)
-                button_frame.pack(pady=10)
+                # Create a separate frame for action buttons with more padding
+                action_frame = ctk.CTkFrame(frame)
+                action_frame.pack(fill="x", pady=0)  # Increased top padding
 
                 def remove_pdf():
                     path_var[0] = None
                     show_drop_area(frame, path_var)
 
-                remove_btn = ctk.CTkButton(button_frame, text="Remove PDF", command=remove_pdf)
-                remove_btn.pack(side="left", padx=5)
+                # Create a container for the buttons
+                button_container = ctk.CTkFrame(action_frame, fg_color="transparent")
+                button_container.pack(expand=True, pady=2)
+
+                remove_btn = ctk.CTkButton(button_container, text="Remove PDF", command=remove_pdf)
+                remove_btn.pack(side="left", padx=20)
 
                 # Show confirm button if both PDFs are present
                 if left_pdf_path[0] and right_pdf_path[0]:
                     confirm_button = ctk.CTkButton(
-                        button_frame,
+                        button_container,
                         text="Confirm",
-                        command=show_pages_in_tabs,  # Changed to show pages in tabs
+                        command=show_pages_in_tabs,
                         fg_color=("green", "green"),
-                        hover_color=("darkgreen", "darkgreen")
+                        hover_color=("darkgreen", "darkgreen"),
+                        width=120,
+                        height=40
                     )
-                    confirm_button.pack(side="left", padx=5)
+                    confirm_button.pack(side="right", padx=20)
 
     # Function to show drop area
     def show_drop_area(frame, path_var):
@@ -647,20 +738,31 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             widget.destroy()
 
         # Create drop area
-        drop_label = ctk.CTkLabel(frame, text="Drag and drop PDF here", font=("Arial", 16))
+        drop_label = ctk.CTkLabel(frame, text="Drag and drop PDF or Image here", font=("Arial", 16))
         drop_label.pack(expand=True)
 
         # Add select button
-        def select_pdf():
+        def select_file():
             file_path = filedialog.askopenfilename(
-                filetypes=[("PDF files", "*.pdf")],
-                title="Select a PDF file"
+                filetypes=[
+                    ("PDF and Image files", "*.pdf;*.png;*.jpg;*.jpeg;*.bmp;*.gif"),
+                    ("PDF files", "*.pdf"),
+                    ("Image files", "*.png;*.jpg;*.jpeg;*.bmp;*.gif")
+                ],
+                title="Select a PDF or Image file"
             )
             if file_path:
-                path_var[0] = file_path
-                show_pdf_preview(frame, file_path, path_var)
+                if file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                    # Convert image to PDF
+                    pdf_bytes = convert_image_to_pdf(file_path)
+                    if pdf_bytes:
+                        path_var[0] = file_path  # Store original image path
+                        show_pdf_preview(frame, pdf_bytes, path_var)
+                else:
+                    path_var[0] = file_path
+                    show_pdf_preview(frame, file_path, path_var)
 
-        select_btn = ctk.CTkButton(frame, text="Or select PDF", command=select_pdf)
+        select_btn = ctk.CTkButton(frame, text="Or select file", command=select_file)
         select_btn.pack(pady=(0, 20))
 
         # Enable drag and drop
@@ -671,10 +773,69 @@ def open_merge_screen(parent, pdf_path, show_pdf_screen):
             if file_path.lower().endswith('.pdf'):
                 path_var[0] = file_path
                 show_pdf_preview(frame, file_path, path_var)
+            elif file_path.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.gif')):
+                # Convert image to PDF
+                pdf_bytes = convert_image_to_pdf(file_path)
+                if pdf_bytes:
+                    path_var[0] = file_path  # Store original image path
+                    show_pdf_preview(frame, pdf_bytes, path_var)
             else:
-                messagebox.showwarning("Invalid File", "Please drop a PDF file")
+                messagebox.showwarning("Invalid File", "Please drop a PDF or image file (PNG, JPG, JPEG, BMP, GIF)")
         
         frame.dnd_bind('<<Drop>>', handle_drop)
+
+    def convert_image_to_pdf(image_path, rotation=0):
+        try:
+            # Open the image
+            img = Image.open(image_path)
+            
+            # Convert to RGB if necessary (for PNG with transparency)
+            if img.mode in ('RGBA', 'LA'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Rotate image if needed
+            if rotation != 0:
+                img = img.rotate(rotation, expand=True, resample=Image.Resampling.BICUBIC)
+            
+            # Define standard A4 size in pixels at 300 DPI
+            A4_WIDTH = 2480  # 8.27 inches * 300 DPI
+            A4_HEIGHT = 3508  # 11.69 inches * 300 DPI
+            
+            # Calculate scaling factor to fit image within A4 size while maintaining aspect ratio
+            width_ratio = A4_WIDTH / img.width
+            height_ratio = A4_HEIGHT / img.height
+            scale_factor = min(width_ratio, height_ratio)
+            
+            # Calculate new dimensions
+            new_width = int(img.width * scale_factor)
+            new_height = int(img.height * scale_factor)
+            
+            # Resize image
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            
+            # Create a new white background image of A4 size
+            background = Image.new('RGB', (A4_WIDTH, A4_HEIGHT), (255, 255, 255))
+            
+            # Calculate position to center the image
+            x_offset = (A4_WIDTH - new_width) // 2
+            y_offset = (A4_HEIGHT - new_height) // 2
+            
+            # Paste the resized image onto the white background
+            background.paste(img, (x_offset, y_offset))
+            
+            # Create PDF in memory
+            pdf_bytes = io.BytesIO()
+            background.save(pdf_bytes, 'PDF', resolution=300.0)
+            pdf_bytes.seek(0)
+            
+            return pdf_bytes
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to convert image to PDF: {str(e)}")
+            return None
 
     # Initialize frames
     show_pdf_preview(left_frame, pdf_path, left_pdf_path)  # Show original PDF on left
